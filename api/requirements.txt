@@ -1,0 +1,5 @@
+pandas
+pygwalker
+flask
+psycopg2-binary
+gunicorn
