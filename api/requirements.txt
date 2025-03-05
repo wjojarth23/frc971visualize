@@ -3,6 +3,5 @@ flask
 psycopg2-binary
 gunicorn
 scipy
-csv
 itertools
 copy
