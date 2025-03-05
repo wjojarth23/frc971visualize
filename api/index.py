@@ -1,12 +1,13 @@
 from flask import Flask
 import psycopg2
 import pandas as pd
+
 app = Flask(__name__)
 DB_HOST = "scouting.frc971.org"
 DB_PORT = 5000
 DB_NAME = "postgres"
-DB_USER = "tableau"       # your username here
-DB_PASSWORD = "xWYNKBkaHasO"   # your password here
+DB_USER = "tableau"
+DB_PASSWORD = "xWYNKBkaHasO"
 
 # Establish connection
 conn = psycopg2.connect(
@@ -28,12 +29,14 @@ ORDER BY s.match_number;
 # Execute the query and load data into a pandas DataFrame
 df = pd.read_sql_query(query, conn)
 
+# Define routes
 @app.route("/")
-def hello():
+def index():
     return "Hello World!"
+
 @app.route("/data")
-def hello():
-    return df
+def get_data():
+    return df.to_html()
 
 if __name__ == "__main__":
     app.run()
