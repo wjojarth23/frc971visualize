@@ -1,6 +1,6 @@
 from flask import Flask
+import psycopg2
 import pandas as pd
-import pygwalker as pyg
 app = Flask(__name__)
 DB_HOST = "scouting.frc971.org"
 DB_PORT = 5000
