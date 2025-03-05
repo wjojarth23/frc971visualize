@@ -73,7 +73,7 @@ def fetch_and_process_data():
         # Calculate the mean level that this team scored on.
         # (Weighted by the number of corals at each level.)
         if total_coral > 0:
-            mean_level = (1 * total_l1 + 2 * total_l2 + 3 * total_l3 + 4 * total_l4) / total_coral
+            mean_level = (1 * total_l1 * total_l2  * total_l3 * total_l4) / total_coral
         else:
             mean_level = 0
 
@@ -196,7 +196,7 @@ def simulate_alliance(alliance):
                     continue  # Max of 12 coral per level
                 time_cost = robot.coral_times[level] + 0.5 * global_coral[level]
                 if time_cost <= robot.remaining_time:
-                    efficiency = (2 + level) / time_cost
+                    efficiency = (1 + level) / time_cost
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('coral', level), time_cost
@@ -218,7 +218,7 @@ def simulate_alliance(alliance):
         if best_action[0] == 'coral':
             level = best_action[1]
             best_robot.coral_cycles[level] += 1
-            best_robot.points += 2 + level
+            best_robot.points += 1 + level
             global_coral[level] += 1
         elif best_action[0] == 'algae':
             algae_type = best_action[1]
