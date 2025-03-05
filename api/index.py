@@ -145,6 +145,8 @@ def simulate_alliance(alliance):
             if robot.remaining_time <= 0:
                 continue
             for level in [1, 2, 3, 4]:
+                if global_coral[level] >= 12:
+                    continue  # Max of 12 coral per level
                 time_cost = robot.coral_times[level] + 0.1 * global_coral[level]
                 if time_cost <= robot.remaining_time:
                     efficiency = (2 + level) / time_cost
@@ -186,9 +188,13 @@ def simulate_alliance(alliance):
         "coral_l1": r.coral_cycles[1], "coral_l2": r.coral_cycles[2],
         "coral_l3": r.coral_cycles[3], "coral_l4": r.coral_cycles[4],
         "algae_barge": r.algae_cycles['barge'], "algae_processor": r.algae_cycles['processor'],
-        "defense_time": r.defense_time, "total_points": r.points
+        "defense_time": r.defense_time, "total_points": r.points,
+        "time_coral_l1": r.coral_times[1], "time_coral_l2": r.coral_times[2],
+        "time_coral_l3": r.coral_times[3], "time_coral_l4": r.coral_times[4],
+        "time_algae_barge": r.algae_times['barge'], "time_algae_processor": r.algae_times['processor']
     } for r in alliance_robots}
     return total_points, details
+
 
 def aggregate_simulations(robots):
     """Aggregate simulation results for picklist generation."""
