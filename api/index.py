@@ -73,7 +73,7 @@ def fetch_and_process_data():
         # Calculate the mean level that this team scored on.
         # (Weighted by the number of corals at each level.)
         if total_coral > 0:
-            mean_level = (1 * total_l1 * total_l2  * total_l3 * total_l4) / total_coral
+            mean_level = (1 * total_l1 + 2 * total_l2 + 3 * total_l3 + 4 * total_l4) / total_coral
         else:
             mean_level = 0
 
