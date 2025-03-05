@@ -20,7 +20,11 @@ DB_PASSWORD = "xWYNKBkaHasO"
 # ----- Data Processing -----
 
 def fetch_and_process_data():
-    """Fetch data from the database and process it into a list of dictionaries."""
+    """Fetch data from the database and process it into a list of dictionaries.
+    
+    Modified to group all coral data together, compute a base coral time,
+    then adjust for each level using the mean coral level.
+    """
     conn = psycopg2.connect(
         host=DB_HOST,
         port=DB_PORT,
@@ -38,26 +42,70 @@ def fetch_and_process_data():
     conn.close()
     results = []
     team_numbers = df['team_number'].unique()
+    
     for team in team_numbers:
         team_data = df[df['team_number'] == team]
         A = []
         b = []
+        # Build the regression matrix using three columns:
+        # processor_teleop, the grouped coral (sum of l1-l4), and net_teleop (algae barge)
         for _, row in team_data.iterrows():
             processor = row['processor_teleop']
-            l1 = row['l1_teleop']
-            l2 = row['l2_teleop']
-            l3 = row['l3_teleop']
-            l4 = row['l4_teleop']
+            coral = row['l1_teleop'] + row['l2_teleop'] + row['l3_teleop'] + row['l4_teleop']
             barge = row['net_teleop']
-            A.append([processor, l1, l2, l3, l4, barge])
+            A.append([processor, coral, barge])
             b.append(110)
         A = np.array(A, dtype=np.float64)
         b = np.array(b, dtype=np.float64)
         try:
-            solution, _, _, _ = lstsq(A, b)  # Using numpy's lstsq, removed lapack_driver
-            processor_time, l1_time, l2_time, l3_time, l4_time, barge_time = solution
+            solution, _, _, _ = lstsq(A, b)
+            processor_time, base_coral_time, barge_time = solution
         except ValueError:
-            processor_time = l1_time = l2_time = l3_time = l4_time = barge_time = 0.0
+            processor_time = base_coral_time = barge_time = 0.0
+
+        # Aggregate total coral counts per level across all matches for the team.
+        total_l1 = team_data['l1_teleop'].sum()
+        total_l2 = team_data['l2_teleop'].sum()
+        total_l3 = team_data['l3_teleop'].sum()
+        total_l4 = team_data['l4_teleop'].sum()
+        total_coral = total_l1 + total_l2 + total_l3 + total_l4
+
+        # Calculate the mean level that this team scored on.
+        # (Weighted by the number of corals at each level.)
+        if total_coral > 0:
+            mean_level = (1 * total_l1 + 2 * total_l2 + 3 * total_l3 + 4 * total_l4) / total_coral
+        else:
+            mean_level = 0
+
+        # Helper function to compute the multiplier for a given level.
+        def compute_multiplier(level, mean_level):
+            if level < mean_level:
+                return 1 - 0.10 * (mean_level - level)
+            elif level > mean_level:
+                return 1 + 0.15 * (level - mean_level)
+            else:
+                return 1
+
+        # Adjust base coral time for each level.
+        # If the team never scored at that level (total count = 0), set time to 9999.
+        if total_l1 == 0:
+            l1_time = 9999
+        else:
+            l1_time = base_coral_time * compute_multiplier(1, mean_level)
+        if total_l2 == 0:
+            l2_time = 9999
+        else:
+            l2_time = base_coral_time * compute_multiplier(2, mean_level)
+        if total_l3 == 0:
+            l3_time = 9999
+        else:
+            l3_time = base_coral_time * compute_multiplier(3, mean_level)
+        if total_l4 == 0:
+            l4_time = 9999
+        else:
+            l4_time = base_coral_time * compute_multiplier(4, mean_level)
+
+        # Compute average values for reporting purposes.
         avg_l1 = team_data['l1_teleop'].mean()
         avg_l2 = team_data['l2_teleop'].mean()
         avg_l3 = team_data['l3_teleop'].mean()
@@ -65,12 +113,11 @@ def fetch_and_process_data():
         avg_processor = team_data['processor_teleop'].mean()
         avg_barge = team_data['net_teleop'].mean()
         avg_defense = team_data['defense_time'].mean() if 'defense_time' in team_data.columns else 0.0
-        if l1_time < 1: l1_time = 9999
-        if l2_time < 1: l2_time = 9999
-        if l3_time < 1: l3_time = 9999
-        if l4_time < 1: l4_time = 9999
+
+        # For consistency with your original logic, if processor or barge times are too low, set them to 9999.
         if processor_time < 1: processor_time = 9999
         if barge_time < 1: barge_time = 9999
+
         results.append({
             'team_number': team,
             'algae_processor': processor_time,
