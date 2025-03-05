@@ -1,5 +1,4 @@
 pandas
-pygwalker
 flask
 psycopg2
 gunicorn
