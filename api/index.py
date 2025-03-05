@@ -145,14 +145,14 @@ def simulate_alliance(alliance):
             if robot.remaining_time <= 0:
                 continue
             for level in [1, 2, 3, 4]:
-                time_cost = robot.coral_times[level] + 0.3 * global_coral[level]
+                time_cost = robot.coral_times[level] + 0.1 * global_coral[level]
                 if time_cost <= robot.remaining_time:
                     efficiency = (2 + level) / time_cost
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('coral', level), time_cost
             for algae_type in ['barge', 'processor']:
-                time_cost = robot.algae_times[algae_type] + 0.5 * global_algae
+                time_cost = robot.algae_times[algae_type] + 0.1 * global_algae
                 points = 4 if algae_type == 'barge' else 2
                 if time_cost <= robot.remaining_time:
                     efficiency = points / time_cost
@@ -161,8 +161,8 @@ def simulate_alliance(alliance):
                         best_robot, best_action, best_action_time = robot, ('algae', algae_type), time_cost
             if robot.remaining_time >= 10:
                 defense_cost = 10 if robot.defense_time == 0 else 1
-                if 0.2 >= best_efficiency and defense_cost <= robot.remaining_time:
-                    best_efficiency = 0.2
+                if 0.05 >= best_efficiency and defense_cost <= robot.remaining_time:
+                    best_efficiency = 0.05
                     best_robot, best_action, best_action_time = robot, ('defense', None), defense_cost
         if not best_robot:
             break
@@ -269,8 +269,8 @@ def simulate():
         # Adjust points for defense impact
         total_defense_time1 = sum(details1[robot.name]['defense_time'] for robot in alliance1)
         total_defense_time2 = sum(details2[robot.name]['defense_time'] for robot in alliance2)
-        points2 -= (total_defense_time1 / 150) * points2 * 0.2
-        points1 -= (total_defense_time2 / 150) * points1 * 0.2
+        points2 -= (total_defense_time1 / 150) * points2 * 0.05
+        points1 -= (total_defense_time2 / 150) * points1 * 0.05
         result = {
             "alliance1_points": points1,
             "alliance2_points": points2,
