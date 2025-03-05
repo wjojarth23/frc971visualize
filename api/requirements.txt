@@ -3,4 +3,3 @@ flask
 psycopg2-binary
 gunicorn
 scipy
-copy
