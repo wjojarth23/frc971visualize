@@ -50,7 +50,7 @@ def fetch_and_process_data():
             l4 = row['l4_teleop']
             barge = row['net_teleop']
             A.append([processor, l1, l2, l3, l4, barge])
-            b.append(135)
+            b.append(110)
         A = np.array(A, dtype=np.float64)
         b = np.array(b, dtype=np.float64)
         try:
@@ -147,14 +147,14 @@ def simulate_alliance(alliance):
             for level in [1, 2, 3, 4]:
                 if global_coral[level] >= 12:
                     continue  # Max of 12 coral per level
-                time_cost = robot.coral_times[level] + 0.1 * global_coral[level]
+                time_cost = robot.coral_times[level] + 0.5 * global_coral[level]
                 if time_cost <= robot.remaining_time:
                     efficiency = (2 + level) / time_cost
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('coral', level), time_cost
             for algae_type in ['barge', 'processor']:
-                time_cost = robot.algae_times[algae_type] + 0.1 * global_algae
+                time_cost = robot.algae_times[algae_type] + 0.3 * global_algae
                 points = 4 if algae_type == 'barge' else 2
                 if time_cost <= robot.remaining_time:
                     efficiency = points / time_cost
