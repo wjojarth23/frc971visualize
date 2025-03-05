@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import psycopg2
 import pandas as pd
 import numpy as np
-from scipy.linalg import lstsq
+from numpy.linalg import lstsq  # Replaced scipy.linalg with numpy.linalg
 import itertools
 import copy
 
@@ -52,7 +52,7 @@ def fetch_and_process_data():
         A = np.array(A, dtype=np.float64)
         b = np.array(b, dtype=np.float64)
         try:
-            solution, _, _, _ = lstsq(A, b, lapack_driver='gelsy')
+            solution, _, _, _ = lstsq(A, b)  # Using numpy's lstsq, removed lapack_driver
             processor_time, l1_time, l2_time, l3_time, l4_time, barge_time = solution
         except ValueError:
             processor_time = l1_time = l2_time = l3_time = l4_time = barge_time = 0.0
