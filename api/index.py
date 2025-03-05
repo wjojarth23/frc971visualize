@@ -1,26 +1,24 @@
-from flask import Flask, send_file, request, jsonify
+from flask import Flask, request, jsonify
 import psycopg2
 import pandas as pd
 import numpy as np
 from scipy.linalg import lstsq
-import csv
 import itertools
 import copy
-import os
 
 app = Flask(__name__)
 
-# Database credentials (replace with your own if different)
+# Database credentials
 DB_HOST = "scouting.frc971.org"
 DB_PORT = 5000
 DB_NAME = "postgres"
 DB_USER = "tableau"
 DB_PASSWORD = "xWYNKBkaHasO"
 
-# ----- Database Connection and Data Retrieval -----
+# ----- Data Processing -----
 
 def fetch_and_process_data():
-    """Fetch data from the database and process it to calculate optimized times."""
+    """Fetch data from the database and process it into a list of dictionaries."""
     conn = psycopg2.connect(
         host=DB_HOST,
         port=DB_PORT,
@@ -50,7 +48,7 @@ def fetch_and_process_data():
             l4 = row['l4_teleop']
             barge = row['net_teleop']
             A.append([processor, l1, l2, l3, l4, barge])
-            b.append(135)  # Total teleop time
+            b.append(135)
         A = np.array(A, dtype=np.float64)
         b = np.array(b, dtype=np.float64)
         try:
@@ -65,7 +63,6 @@ def fetch_and_process_data():
         avg_processor = team_data['processor_teleop'].mean()
         avg_barge = team_data['net_teleop'].mean()
         avg_defense = team_data['defense_time'].mean() if 'defense_time' in team_data.columns else 0.0
-        # Set large times for invalid solutions to avoid division by zero
         if l1_time < 1: l1_time = 9999
         if l2_time < 1: l2_time = 9999
         if l3_time < 1: l3_time = 9999
@@ -88,65 +85,63 @@ def fetch_and_process_data():
             'avg_barge': avg_barge,
             'avg_defense': avg_defense
         })
-    result_df = pd.DataFrame(results)
-    result_df.to_csv('optimized_times.csv', index=False)
+    return results
 
-# ----- Simulation and Picklist Generation -----
+# ----- Robot Class -----
 
 class Robot:
-    """Represents a robot with action times and simulation state."""
+    """Represents a robot with performance metrics for simulation."""
     def __init__(self, name, coral_times, algae_times, actual):
         self.name = name
-        self.coral_times = coral_times  # Dict of times for coral levels 1-4
-        self.algae_times = algae_times  # Dict of times for barge and processor
-        self.remaining_time = 150  # Total match time in seconds
+        self.coral_times = coral_times  # Dict: {level: time}
+        self.algae_times = algae_times  # Dict: {type: time}
+        self.remaining_time = 150
         self.coral_cycles = {1: 0, 2: 0, 3: 0, 4: 0}
         self.algae_cycles = {'barge': 0, 'processor': 0}
         self.defense_time = 0
         self.points = 0
-        self.actual = actual  # Actual averages from data
+        self.actual = actual  # Dict: actual averages from data
 
-def read_robots_from_csv(filename):
-    """Read robot data from the optimized times CSV."""
+# ----- Helper Functions -----
+
+def create_robots_from_data(data):
+    """Create Robot objects from processed data."""
     robots = []
-    with open(filename, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            name = row['team_number']
-            coral_times = {
-                1: float(row['coral_l1']),
-                2: float(row['coral_l2']),
-                3: float(row['coral_l3']),
-                4: float(row['coral_l4']),
-            }
-            algae_times = {
-                'barge': float(row['algae_barge']),
-                'processor': float(row['algae_processor'])
-            }
-            actual = {
-                'l1': float(row['avg_l1']),
-                'l2': float(row['avg_l2']),
-                'l3': float(row['avg_l3']),
-                'l4': float(row['avg_l4']),
-                'barge': float(row['avg_barge']),
-                'processor': float(row['avg_processor']),
-                'defense': float(row['avg_defense'])
-            }
-            robots.append(Robot(name, coral_times, algae_times, actual))
+    for row in data:
+        name = row['team_number']
+        coral_times = {
+            1: row['coral_l1'],
+            2: row['coral_l2'],
+            3: row['coral_l3'],
+            4: row['coral_l4'],
+        }
+        algae_times = {
+            'barge': row['algae_barge'],
+            'processor': row['algae_processor']
+        }
+        actual = {
+            'l1': row['avg_l1'],
+            'l2': row['avg_l2'],
+            'l3': row['avg_l3'],
+            'l4': row['avg_l4'],
+            'barge': row['avg_barge'],
+            'processor': row['avg_processor'],
+            'defense': row['avg_defense']
+        }
+        robots.append(Robot(name, coral_times, algae_times, actual))
     return robots
 
 def simulate_alliance(alliance):
-    """Simulate an alliance's performance, choosing optimal actions."""
+    """Simulate an alliance's performance and return points and details."""
     alliance_robots = [copy.deepcopy(robot) for robot in alliance]
-    global_coral = {1: 0, 2: 0, 3: 0, 4: 0}  # Track global coral counts
-    global_algae = 0  # Track global algae count
+    global_coral = {1: 0, 2: 0, 3: 0, 4: 0}
+    global_algae = 0
     while True:
         best_efficiency = 0
         best_robot = best_action = best_action_time = None
         for robot in alliance_robots:
             if robot.remaining_time <= 0:
                 continue
-            # Evaluate coral actions
             for level in [1, 2, 3, 4]:
                 time_cost = robot.coral_times[level] + 0.3 * global_coral[level]
                 if time_cost <= robot.remaining_time:
@@ -154,7 +149,6 @@ def simulate_alliance(alliance):
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('coral', level), time_cost
-            # Evaluate algae actions
             for algae_type in ['barge', 'processor']:
                 time_cost = robot.algae_times[algae_type] + 0.5 * global_algae
                 points = 4 if algae_type == 'barge' else 2
@@ -163,7 +157,6 @@ def simulate_alliance(alliance):
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('algae', algae_type), time_cost
-            # Evaluate defense action
             if robot.remaining_time >= 10:
                 defense_cost = 10 if robot.defense_time == 0 else 1
                 if 0.2 >= best_efficiency and defense_cost <= robot.remaining_time:
@@ -184,7 +177,7 @@ def simulate_alliance(alliance):
         elif best_action[0] == 'defense':
             added_time = 10 if best_robot.defense_time == 0 else 1
             best_robot.defense_time += added_time
-            best_robot.points += 0  # Defense doesn't add points directly
+            best_robot.points += 0
         best_robot.remaining_time -= best_action_time
     total_points = sum(r.points for r in alliance_robots)
     details = {r.name: {
@@ -212,73 +205,69 @@ def aggregate_simulations(robots):
                 team_agg[name][f'weighted_{metric}'] += weight * value
     return team_agg
 
-def build_picklist(robots, team_agg, output_filename="picklist.csv"):
-    """Generate the picklist CSV with simulated and actual data."""
+def build_picklist(robots, team_agg):
+    """Build the picklist data as a list of dictionaries."""
     actual_map = {r.name: r.actual for r in robots}
-    fieldnames = ["name", "weighted_score"] + [
-        f"{sim_act}_{m}" for m in ["l1", "l2", "l3", "l4", "barge", "processor", "defense"]
-        for sim_act in ["sim_avg", "actual", "pct_diff"]
-    ]
-    with open(output_filename, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames)
-        writer.writeheader()
-        for name, data in team_agg.items():
-            total_weight = data['total_weight']
-            sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
-                'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
-            ]}
-            actual = actual_map.get(name, {k: 0 for k in ['l1', 'l2', 'l3', 'l4', 'barge', 'processor', 'defense']})
-            row = {'name': name, 'weighted_score': total_weight}
-            for m in ['l1', 'l2', 'l3', 'l4']:
-                row[f'sim_avg_{m}'] = sim_avg[f'coral_{m}']
-                row[f'actual_{m}'] = actual[m]
-                row[f'pct_diff_{m}'] = (sim_avg[f'coral_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
-            for m in ['barge', 'processor']:
-                row[f'sim_avg_{m}'] = sim_avg[f'algae_{m}']
-                row[f'actual_{m}'] = actual[m]
-                row[f'pct_diff_{m}'] = (sim_avg[f'algae_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
-            row['sim_avg_defense'] = sim_avg['defense_time']
-            row['actual_defense'] = actual['defense']
-            row['pct_diff_defense'] = (sim_avg['defense_time'] - actual['defense']) / actual['defense'] * 100 if actual['defense'] else 'N/A'
-            writer.writerow(row)
+    picklist_data = []
+    for name, data in team_agg.items():
+        total_weight = data['total_weight']
+        sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
+            'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
+        ]}
+        actual = actual_map.get(name, {k: 0 for k in ['l1', 'l2', 'l3', 'l4', 'barge', 'processor', 'defense']})
+        row = {'name': name, 'weighted_score': total_weight}
+        for m in ['l1', 'l2', 'l3', 'l4']:
+            row[f'sim_avg_{m}'] = sim_avg[f'coral_{m}']
+            row[f'actual_{m}'] = actual[m]
+            row[f'pct_diff_{m}'] = (sim_avg[f'coral_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
+        for m in ['barge', 'processor']:
+            row[f'sim_avg_{m}'] = sim_avg[f'algae_{m}']
+            row[f'actual_{m}'] = actual[m]
+            row[f'pct_diff_{m}'] = (sim_avg[f'algae_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
+        row['sim_avg_defense'] = sim_avg['defense_time']
+        row['actual_defense'] = actual['defense']
+        row['pct_diff_defense'] = (sim_avg['defense_time'] - actual['defense']) / actual['defense'] * 100 if actual['defense'] else 'N/A'
+        picklist_data.append(row)
+    return picklist_data
 
 # ----- Flask Routes -----
 
 @app.route("/picklist", methods=["GET"])
 def picklist():
-    """Generate and return the picklist as a downloadable CSV."""
+    """Generate and return the picklist as JSON."""
     try:
-        fetch_and_process_data()
-        robots = read_robots_from_csv('optimized_times.csv')
+        optimized_data = fetch_and_process_data()
+        robots = create_robots_from_data(optimized_data)
         if len(robots) < 3:
             return "Insufficient teams for simulation.", 400
         team_agg = aggregate_simulations(robots)
-        build_picklist(robots, team_agg)
-        return send_file('picklist.csv', as_attachment=True)
+        picklist_data = build_picklist(robots, team_agg)
+        return jsonify(picklist_data)
     except Exception as e:
         return f"Error generating picklist: {e}", 500
 
 @app.route("/simulate", methods=["POST"])
 def simulate():
-    """Simulate a match between two alliances, accounting for defense impacts."""
+    """Simulate a match between two alliances and return results as JSON."""
     try:
         data = request.get_json()
         alliance1_teams = data.get("alliance1", [])
         alliance2_teams = data.get("alliance2", [])
         if len(alliance1_teams) != 3 or len(alliance2_teams) != 3:
             return "Each alliance must have exactly 3 teams.", 400
-        fetch_and_process_data()
-        robots = read_robots_from_csv('optimized_times.csv')
-        alliance1 = [robot for robot in robots if robot.name in alliance1_teams]
-        alliance2 = [robot for robot in robots if robot.name in alliance2_teams]
+        optimized_data = fetch_and_process_data()
+        robots = create_robots_from_data(optimized_data)
+        robot_dict = {robot.name: robot for robot in robots}
+        alliance1 = [robot_dict[team] for team in alliance1_teams if team in robot_dict]
+        alliance2 = [robot_dict[team] for team in alliance2_teams if team in robot_dict]
         if len(alliance1) != 3 or len(alliance2) != 3:
             return "One or more teams not found.", 404
         points1, details1 = simulate_alliance(alliance1)
         points2, details2 = simulate_alliance(alliance2)
-        # Adjust points for defense impact on opposing alliance
-        total_defense_time1 = sum(details1[robot]['defense_time'] for robot in details1)
-        total_defense_time2 = sum(details2[robot]['defense_time'] for robot in details2)
-        points2 -= (total_defense_time1 / 150) * points2 * 0.2  # Defense reduces opponent points
+        # Adjust points for defense impact
+        total_defense_time1 = sum(details1[robot.name]['defense_time'] for robot in alliance1)
+        total_defense_time2 = sum(details2[robot.name]['defense_time'] for robot in alliance2)
+        points2 -= (total_defense_time1 / 150) * points2 * 0.2
         points1 -= (total_defense_time2 / 150) * points1 * 0.2
         result = {
             "alliance1_points": points1,
