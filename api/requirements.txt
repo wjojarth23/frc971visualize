@@ -1,5 +1,5 @@
 pandas
 pygwalker
 flask
-psycopg2-binary
+psycopg2
 gunicorn
