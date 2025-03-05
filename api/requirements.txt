@@ -1,3 +1,4 @@
+flask_cors
 pandas
 flask
 psycopg2-binary
