@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import psycopg2
 import pandas as pd
 import numpy as np
-from numpy.linalg import lstsq  # Replaced scipy.linalg with numpy.linalg
+from numpy.linalg import lstsq
 import itertools
 import copy
 from flask_cors import CORS
@@ -20,11 +20,7 @@ DB_PASSWORD = "xWYNKBkaHasO"
 # ----- Data Processing -----
 
 def fetch_and_process_data():
-    """Fetch data from the database and process it into a list of dictionaries.
-    
-    Modified to group all coral data together, compute a base coral time,
-    then adjust for each level using the mean coral level.
-    """
+    """Fetch data from the database and process it into a list of dictionaries."""
     conn = psycopg2.connect(
         host=DB_HOST,
         port=DB_PORT,
@@ -47,8 +43,6 @@ def fetch_and_process_data():
         team_data = df[df['team_number'] == team]
         A = []
         b = []
-        # Build the regression matrix using three columns:
-        # processor_teleop, the grouped coral (sum of l1-l4), and net_teleop (algae barge)
         for _, row in team_data.iterrows():
             processor = row['processor_teleop']
             coral = row['l1_teleop'] + row['l2_teleop'] + row['l3_teleop'] + row['l4_teleop']
@@ -63,21 +57,17 @@ def fetch_and_process_data():
         except ValueError:
             processor_time = base_coral_time = barge_time = 0.0
 
-        # Aggregate total coral counts per level across all matches for the team.
         total_l1 = team_data['l1_teleop'].sum()
         total_l2 = team_data['l2_teleop'].sum()
         total_l3 = team_data['l3_teleop'].sum()
         total_l4 = team_data['l4_teleop'].sum()
         total_coral = total_l1 + total_l2 + total_l3 + total_l4
 
-        # Calculate the mean level that this team scored on.
-        # (Weighted by the number of corals at each level.)
         if total_coral > 0:
             mean_level = (1 * total_l1 + 2 * total_l2 + 3 * total_l3 + 4 * total_l4) / total_coral
         else:
             mean_level = 0
 
-        # Helper function to compute the multiplier for a given level.
         def compute_multiplier(level, mean_level):
             if level < mean_level:
                 return 1 - 0.10 * (mean_level - level)
@@ -86,8 +76,6 @@ def fetch_and_process_data():
             else:
                 return 1
 
-        # Adjust base coral time for each level.
-        # If the team never scored at that level (total count = 0), set time to 9999.
         if total_l1 == 0:
             l1_time = 9999
         else:
@@ -105,7 +93,6 @@ def fetch_and_process_data():
         else:
             l4_time = base_coral_time * compute_multiplier(4, mean_level)
 
-        # Compute average values for reporting purposes.
         avg_l1 = team_data['l1_teleop'].mean()
         avg_l2 = team_data['l2_teleop'].mean()
         avg_l3 = team_data['l3_teleop'].mean()
@@ -114,7 +101,6 @@ def fetch_and_process_data():
         avg_barge = team_data['net_teleop'].mean()
         avg_defense = team_data['defense_time'].mean() if 'defense_time' in team_data.columns else 0.0
 
-        # For consistency with your original logic, if processor or barge times are too low, set them to 9999.
         if processor_time < 1: processor_time = 9999
         if barge_time < 1: barge_time = 9999
 
@@ -180,11 +166,13 @@ def create_robots_from_data(data):
         robots.append(Robot(name, coral_times, algae_times, actual))
     return robots
 
-def simulate_alliance(alliance):
+def simulate_alliance(alliance, mode="POINTS"):
     """Simulate an alliance's performance and return points and details."""
     alliance_robots = [copy.deepcopy(robot) for robot in alliance]
     global_coral = {1: 0, 2: 0, 3: 0, 4: 0}
     global_algae = 0
+    total_algae_processor = 0  # Track algae placed in processor for RP mode
+
     while True:
         best_efficiency = 0
         best_robot = best_action = best_action_time = None
@@ -196,13 +184,24 @@ def simulate_alliance(alliance):
                     continue  # Max of 12 coral per level
                 time_cost = robot.coral_times[level] + 0.5 * global_coral[level]
                 if time_cost <= robot.remaining_time:
-                    efficiency = (1 + level) / time_cost
+                    # In RP mode, prioritize coral on levels < 5 until 3 levels have >= 5
+                    if (mode == "RP" and 
+                        sum(1 for l in [1, 2, 3, 4] if global_coral[l] >= 5) < 3 and 
+                        global_coral[level] < 5):
+                        points = 100  # High bonus to meet constraint
+                    else:
+                        points = 1 + level
+                    efficiency = points / time_cost
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('coral', level), time_cost
             for algae_type in ['barge', 'processor']:
                 time_cost = robot.algae_times[algae_type] + 0.3 * global_algae
-                points = 4 if algae_type == 'barge' else 2
+                # In RP mode, prioritize processor algae until 2 are placed
+                if mode == "RP" and algae_type == 'processor' and total_algae_processor < 2:
+                    points = 100  # High bonus to meet constraint
+                else:
+                    points = 4 if algae_type == 'barge' else 2
                 if time_cost <= robot.remaining_time:
                     efficiency = points / time_cost
                     if efficiency > best_efficiency:
@@ -225,6 +224,8 @@ def simulate_alliance(alliance):
             best_robot.algae_cycles[algae_type] += 1
             best_robot.points += 4 if algae_type == 'barge' else 2
             global_algae += 1
+            if algae_type == 'processor':
+                total_algae_processor += 1
         elif best_action[0] == 'defense':
             added_time = 10 if best_robot.defense_time == 0 else 1
             best_robot.defense_time += added_time
@@ -242,26 +243,18 @@ def simulate_alliance(alliance):
     } for r in alliance_robots}
     return total_points, details
 
-
 def aggregate_simulations(robots):
-    """Aggregate simulation results for picklist generation."""
+    """Aggregate simulation results for picklist generation using RP mode."""
     team_agg = {}
-    
-    # Find the robot with team number 9584
     team_9584 = next((robot for robot in robots if robot.name == 9584), None)
-    
-    # If team 9584 was found, remove it from the list to avoid duplicates
     remaining_robots = [robot for robot in robots if robot.name != 9584]
-    
-    # If team 9584 was not found, use the first robot as before
     if team_9584 is None:
         team_9584 = robots[0]
         remaining_robots = robots[1:]
     
-    # Now use team_9584 as the first team in each alliance
     for team_a, team_b in itertools.combinations(remaining_robots, 2):
         alliance = (team_9584, team_a, team_b)
-        _, results = simulate_alliance(alliance)
+        _, results = simulate_alliance(alliance, mode="RP")  # Always use RP mode
         sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
         for rank, (name, metrics) in enumerate(sorted_teams, 1):
             weight = 1 / rank
@@ -303,7 +296,7 @@ def build_picklist(robots, team_agg):
 
 @app.route("/picklist", methods=["GET"])
 def picklist():
-    """Generate and return the picklist as JSON."""
+    """Generate and return the picklist as JSON using RP mode."""
     try:
         optimized_data = fetch_and_process_data()
         robots = create_robots_from_data(optimized_data)
@@ -322,6 +315,9 @@ def simulate():
         data = request.get_json()
         alliance1_teams = data.get("alliance1", [])
         alliance2_teams = data.get("alliance2", [])
+        mode = data.get("mode", "POINTS")  # Default to POINTS if not specified
+        if mode not in ["POINTS", "RP"]:
+            return "Invalid mode. Must be 'POINTS' or 'RP'.", 400
         if len(alliance1_teams) != 3 or len(alliance2_teams) != 3:
             return "Each alliance must have exactly 3 teams.", 400
         optimized_data = fetch_and_process_data()
@@ -331,8 +327,8 @@ def simulate():
         alliance2 = [robot_dict[team] for team in alliance2_teams if team in robot_dict]
         if len(alliance1) != 3 or len(alliance2) != 3:
             return "One or more teams not found.", 404
-        points1, details1 = simulate_alliance(alliance1)
-        points2, details2 = simulate_alliance(alliance2)
+        points1, details1 = simulate_alliance(alliance1, mode=mode)
+        points2, details2 = simulate_alliance(alliance2, mode=mode)
         # Adjust points for defense impact
         total_defense_time1 = sum(details1[robot.name]['defense_time'] for robot in alliance1)
         total_defense_time2 = sum(details2[robot.name]['defense_time'] for robot in alliance2)
