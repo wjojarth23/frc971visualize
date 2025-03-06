@@ -243,6 +243,7 @@ def simulate_alliance(alliance):
     return total_points, details
 
 def aggregate_simulations(robots):
+    global first_team
     """Aggregate simulation results for picklist generation with team 9584 as the first team."""
     team_agg = {}
 
@@ -270,6 +271,7 @@ def build_picklist(robots, team_agg):
     """Build the picklist data as a list of dictionaries."""
     actual_map = {r.name: r.actual for r in robots}
     picklist_data = []
+    global first_team
     for name, data in team_agg.items():
         if name == first_team:
             continue
