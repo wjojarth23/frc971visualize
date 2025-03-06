@@ -243,17 +243,21 @@ def simulate_alliance(alliance):
     return total_points, details
 
 def aggregate_simulations(robots):
-    global first_team
     """Aggregate simulation results for picklist generation with team 9584 as the first team."""
+    global first_team
     team_agg = {}
 
-    if first_team not in robots:
+    # Find the Robot object for first_team (9584)
+    first_team_robot = next((robot for robot in robots if robot.name == first_team), None)
+    if not first_team_robot:
         raise ValueError(f"Team {first_team} is not in the provided robot list.")
 
+    # Simulate alliances with first_team (9584) always included
     for team_a, team_b in itertools.combinations(robots, 2):
-        if first_team in (team_a, team_b):  # Ensure first_team is always part of the alliance
-            alliance = (first_team, team_a, team_b)
-            _, results = simulate_alliance(alliance)
+        # Only include alliances where at least one of team_a or team_b isn't first_team
+        if team_a.name != first_team and team_b.name != first_team:
+            alliance = [first_team_robot, team_a, team_b]  # first_team is always included
+            points, results = simulate_alliance(alliance)
 
             sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
             for rank, (name, metrics) in enumerate(sorted_teams, 1):
