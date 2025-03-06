@@ -265,6 +265,8 @@ def build_picklist(robots, team_agg):
     actual_map = {r.name: r.actual for r in robots}
     picklist_data = []
     for name, data in team_agg.items():
+        if name == 9584 or name == "9584":
+            continue
         total_weight = data['total_weight']
         sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
             'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
