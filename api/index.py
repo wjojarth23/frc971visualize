@@ -16,6 +16,7 @@ DB_PORT = 5000
 DB_NAME = "postgres"
 DB_USER = "tableau"
 DB_PASSWORD = "xWYNKBkaHasO"
+
 # ----- Data Processing -----
 
 def fetch_and_process_data():
@@ -243,61 +244,45 @@ def simulate_alliance(alliance):
 
 
 def aggregate_simulations(robots):
-    """Aggregate simulation results for picklist generation with team 9584 as the first team."""
+    """Aggregate simulation results for picklist generation."""
     team_agg = {}
-    first_team = 9584  # Set fixed first team
-
-    if first_team not in robots:
-        raise ValueError(f"Team {first_team} is not in the provided robot list.")
-
-    for team_a, team_b in itertools.combinations(robots, 2):
-        if first_team in (team_a, team_b):  # Ensure first_team is always part of the alliance
-            alliance = (first_team, team_a, team_b)
-            _, results = simulate_alliance(alliance)
-
-            sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
-            for rank, (name, metrics) in enumerate(sorted_teams, 1):
-                weight = 1 / rank
-                if name not in team_agg:
-                    team_agg[name] = {k: 0 for k in ["total_weight"] + [f"weighted_{m}" for m in metrics]}
-                team_agg[name]['total_weight'] += weight
-                for metric, value in metrics.items():
-                    team_agg[name][f'weighted_{metric}'] += weight * value
-
+    first_team = robots[0]
+    for team_a, team_b in itertools.combinations(robots[1:], 2):
+        alliance = (first_team, team_a, team_b)
+        _, results = simulate_alliance(alliance)
+        sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
+        for rank, (name, metrics) in enumerate(sorted_teams, 1):
+            weight = 1 / rank
+            if name not in team_agg:
+                team_agg[name] = {k: 0 for k in ["total_weight"] + [f"weighted_{m}" for m in metrics]}
+            team_agg[name]['total_weight'] += weight
+            for metric, value in metrics.items():
+                team_agg[name][f'weighted_{metric}'] += weight * value
     return team_agg
-
 
 def build_picklist(robots, team_agg):
     """Build the picklist data as a list of dictionaries."""
-    first_team = 9584  # Exclude this team from the picklist
     actual_map = {r.name: r.actual for r in robots}
     picklist_data = []
-
     for name, data in team_agg.items():
-        if name != first_team:
-
-            total_weight = data['total_weight']
-            sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
-                'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
-            ]}
-            actual = actual_map.get(name, {k: 0 for k in ['l1', 'l2', 'l3', 'l4', 'barge', 'processor', 'defense']})
-            row = {'name': name, 'weighted_score': total_weight}
-            
-            for m in ['l1', 'l2', 'l3', 'l4']:
-                row[f'sim_avg_{m}'] = sim_avg[f'coral_{m}']
-                row[f'actual_{m}'] = actual[m]
-                row[f'pct_diff_{m}'] = (sim_avg[f'coral_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
-            for m in ['barge', 'processor']:
-                row[f'sim_avg_{m}'] = sim_avg[f'algae_{m}']
-                row[f'actual_{m}'] = actual[m]
-                row[f'pct_diff_{m}'] = (sim_avg[f'algae_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
-            
-            row['sim_avg_defense'] = sim_avg['defense_time']
-            row['actual_defense'] = actual['defense']
-            row['pct_diff_defense'] = (sim_avg['defense_time'] - actual['defense']) / actual['defense'] * 100 if actual['defense'] else 'N/A'
-            
-            picklist_data.append(row)
-    
+        total_weight = data['total_weight']
+        sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
+            'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
+        ]}
+        actual = actual_map.get(name, {k: 0 for k in ['l1', 'l2', 'l3', 'l4', 'barge', 'processor', 'defense']})
+        row = {'name': name, 'weighted_score': total_weight}
+        for m in ['l1', 'l2', 'l3', 'l4']:
+            row[f'sim_avg_{m}'] = sim_avg[f'coral_{m}']
+            row[f'actual_{m}'] = actual[m]
+            row[f'pct_diff_{m}'] = (sim_avg[f'coral_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
+        for m in ['barge', 'processor']:
+            row[f'sim_avg_{m}'] = sim_avg[f'algae_{m}']
+            row[f'actual_{m}'] = actual[m]
+            row[f'pct_diff_{m}'] = (sim_avg[f'algae_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
+        row['sim_avg_defense'] = sim_avg['defense_time']
+        row['actual_defense'] = actual['defense']
+        row['pct_diff_defense'] = (sim_avg['defense_time'] - actual['defense']) / actual['defense'] * 100 if actual['defense'] else 'N/A'
+        picklist_data.append(row)
     return picklist_data
 
 # ----- Flask Routes -----
