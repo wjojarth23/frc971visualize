@@ -243,21 +243,26 @@ def simulate_alliance(alliance):
     return total_points, details
 
 def aggregate_simulations(robots):
-    """Aggregate simulation results for picklist generation with 3-team alliances."""
+    """Aggregate simulation results for picklist generation with team 9584 as the first team."""
     team_agg = {}
+    first_team = 9584  # Set fixed first team
 
-    for team_a, team_b, team_c in itertools.combinations(robots, 3):
-        alliance = (team_a, team_b, team_c)
-        _, results = simulate_alliance(alliance)
+    if first_team not in robots:
+        raise ValueError(f"Team {first_team} is not in the provided robot list.")
 
-        sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
-        for rank, (name, metrics) in enumerate(sorted_teams, 1):
-            weight = 1 / rank
-            if name not in team_agg:
-                team_agg[name] = {k: 0 for k in ["total_weight"] + [f"weighted_{m}" for m in metrics]}
-            team_agg[name]['total_weight'] += weight
-            for metric, value in metrics.items():
-                team_agg[name][f'weighted_{metric}'] += weight * value
+    for team_a, team_b in itertools.combinations(robots, 2):
+        if first_team in (team_a, team_b):  # Ensure first_team is always part of the alliance
+            alliance = (first_team, team_a, team_b)
+            _, results = simulate_alliance(alliance)
+
+            sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
+            for rank, (name, metrics) in enumerate(sorted_teams, 1):
+                weight = 1 / rank
+                if name not in team_agg:
+                    team_agg[name] = {k: 0 for k in ["total_weight"] + [f"weighted_{m}" for m in metrics]}
+                team_agg[name]['total_weight'] += weight
+                for metric, value in metrics.items():
+                    team_agg[name][f'weighted_{metric}'] += weight * value
 
     return team_agg
 
