@@ -247,8 +247,8 @@ def aggregate_simulations(robots):
     """Aggregate simulation results for picklist generation."""
     team_agg = {}
     first_team = robots[0]
-    for team_a, team_b in itertools.combinations(robots[1:], 2):
-        alliance = (first_team, team_a, team_b)
+    for team_a, team_b,team_c in itertools.combinations(robots, 3):
+        alliance = (team_c, team_a, team_b)
         _, results = simulate_alliance(alliance)
         sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
         for rank, (name, metrics) in enumerate(sorted_teams, 1):
