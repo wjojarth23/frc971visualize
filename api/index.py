@@ -248,10 +248,10 @@ def aggregate_simulations(robots):
     team_agg = {}
     
     # Find the robot with team number 9584
-    team_9584 = next((robot for robot in robots if robot.team_number == 9584), None)
+    team_9584 = next((robot for robot in robots if robot.name == 9584), None)
     
     # If team 9584 was found, remove it from the list to avoid duplicates
-    remaining_robots = [robot for robot in robots if robot.team_number != 9584]
+    remaining_robots = [robot for robot in robots if robot.name != 9584]
     
     # If team 9584 was not found, use the first robot as before
     if team_9584 is None:
