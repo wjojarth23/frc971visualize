@@ -242,14 +242,14 @@ def simulate_alliance(alliance):
     } for r in alliance_robots}
     return total_points, details
 
-
 def aggregate_simulations(robots):
-    """Aggregate simulation results for picklist generation."""
+    """Aggregate simulation results for picklist generation with 3-team alliances."""
     team_agg = {}
-    first_team = robots[0]
-    for team_a, team_b,team_c in itertools.combinations(robots, 3):
-        alliance = (team_c, team_a, team_b)
+
+    for team_a, team_b, team_c in itertools.combinations(robots, 3):
+        alliance = (team_a, team_b, team_c)
         _, results = simulate_alliance(alliance)
+
         sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
         for rank, (name, metrics) in enumerate(sorted_teams, 1):
             weight = 1 / rank
@@ -258,7 +258,9 @@ def aggregate_simulations(robots):
             team_agg[name]['total_weight'] += weight
             for metric, value in metrics.items():
                 team_agg[name][f'weighted_{metric}'] += weight * value
+
     return team_agg
+
 
 def build_picklist(robots, team_agg):
     """Build the picklist data as a list of dictionaries."""
