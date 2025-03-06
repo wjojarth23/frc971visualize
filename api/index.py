@@ -246,9 +246,21 @@ def simulate_alliance(alliance):
 def aggregate_simulations(robots):
     """Aggregate simulation results for picklist generation."""
     team_agg = {}
-    first_team = robots[0]
-    for team_a, team_b in itertools.combinations(robots[1:], 2):
-        alliance = (first_team, team_a, team_b)
+    
+    # Find the robot with team number 9584
+    team_9584 = next((robot for robot in robots if robot.team_number == 9584), None)
+    
+    # If team 9584 was found, remove it from the list to avoid duplicates
+    remaining_robots = [robot for robot in robots if robot.team_number != 9584]
+    
+    # If team 9584 was not found, use the first robot as before
+    if team_9584 is None:
+        team_9584 = robots[0]
+        remaining_robots = robots[1:]
+    
+    # Now use team_9584 as the first team in each alliance
+    for team_a, team_b in itertools.combinations(remaining_robots, 2):
+        alliance = (team_9584, team_a, team_b)
         _, results = simulate_alliance(alliance)
         sorted_teams = sorted(results.items(), key=lambda x: -x[1]['total_points'])
         for rank, (name, metrics) in enumerate(sorted_teams, 1):
