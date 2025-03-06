@@ -274,30 +274,29 @@ def build_picklist(robots, team_agg):
     picklist_data = []
 
     for name, data in team_agg.items():
-        if name == first_team:
-            continue  # Skip adding first_team to the picklist
+        if name != first_team:
 
-        total_weight = data['total_weight']
-        sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
-            'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
-        ]}
-        actual = actual_map.get(name, {k: 0 for k in ['l1', 'l2', 'l3', 'l4', 'barge', 'processor', 'defense']})
-        row = {'name': name, 'weighted_score': total_weight}
-        
-        for m in ['l1', 'l2', 'l3', 'l4']:
-            row[f'sim_avg_{m}'] = sim_avg[f'coral_{m}']
-            row[f'actual_{m}'] = actual[m]
-            row[f'pct_diff_{m}'] = (sim_avg[f'coral_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
-        for m in ['barge', 'processor']:
-            row[f'sim_avg_{m}'] = sim_avg[f'algae_{m}']
-            row[f'actual_{m}'] = actual[m]
-            row[f'pct_diff_{m}'] = (sim_avg[f'algae_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
-        
-        row['sim_avg_defense'] = sim_avg['defense_time']
-        row['actual_defense'] = actual['defense']
-        row['pct_diff_defense'] = (sim_avg['defense_time'] - actual['defense']) / actual['defense'] * 100 if actual['defense'] else 'N/A'
-        
-        picklist_data.append(row)
+            total_weight = data['total_weight']
+            sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
+                'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
+            ]}
+            actual = actual_map.get(name, {k: 0 for k in ['l1', 'l2', 'l3', 'l4', 'barge', 'processor', 'defense']})
+            row = {'name': name, 'weighted_score': total_weight}
+            
+            for m in ['l1', 'l2', 'l3', 'l4']:
+                row[f'sim_avg_{m}'] = sim_avg[f'coral_{m}']
+                row[f'actual_{m}'] = actual[m]
+                row[f'pct_diff_{m}'] = (sim_avg[f'coral_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
+            for m in ['barge', 'processor']:
+                row[f'sim_avg_{m}'] = sim_avg[f'algae_{m}']
+                row[f'actual_{m}'] = actual[m]
+                row[f'pct_diff_{m}'] = (sim_avg[f'algae_{m}'] - actual[m]) / actual[m] * 100 if actual[m] else 'N/A'
+            
+            row['sim_avg_defense'] = sim_avg['defense_time']
+            row['actual_defense'] = actual['defense']
+            row['pct_diff_defense'] = (sim_avg['defense_time'] - actual['defense']) / actual['defense'] * 100 if actual['defense'] else 'N/A'
+            
+            picklist_data.append(row)
     
     return picklist_data
 
