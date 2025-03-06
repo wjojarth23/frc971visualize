@@ -16,7 +16,7 @@ DB_PORT = 5000
 DB_NAME = "postgres"
 DB_USER = "tableau"
 DB_PASSWORD = "xWYNKBkaHasO"
-
+first_team=9584
 # ----- Data Processing -----
 
 def fetch_and_process_data():
@@ -245,7 +245,6 @@ def simulate_alliance(alliance):
 def aggregate_simulations(robots):
     """Aggregate simulation results for picklist generation with team 9584 as the first team."""
     team_agg = {}
-    first_team = 9584  # Set fixed first team
 
     if first_team not in robots:
         raise ValueError(f"Team {first_team} is not in the provided robot list.")
@@ -272,6 +271,8 @@ def build_picklist(robots, team_agg):
     actual_map = {r.name: r.actual for r in robots}
     picklist_data = []
     for name, data in team_agg.items():
+        if name == first_team:
+            continue
         total_weight = data['total_weight']
         sim_avg = {m: data[f'weighted_{m}'] / total_weight for m in [
             'coral_l1', 'coral_l2', 'coral_l3', 'coral_l4', 'algae_barge', 'algae_processor', 'defense_time'
