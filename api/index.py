@@ -315,8 +315,9 @@ def simulate():
         data = request.get_json()
         alliance1_teams = data.get("alliance1", [])
         alliance2_teams = data.get("alliance2", [])
-        mode = data.get("mode1", "POINTS")  # Default to POINTS if not specified
-        if mode not in ["POINTS", "RP"]:
+        mode1 = data.get("mode1", "POINTS")  # Default to POINTS if not specified
+        mode2 = data.get("mode2", "POINTS")  # Default to POINTS if not specified
+        if mode1 not in ["POINTS", "RP"] or mode2 not in ["POINTS", "RP"]:
             return "Invalid mode. Must be 'POINTS' or 'RP'.", 400
         if len(alliance1_teams) != 3 or len(alliance2_teams) != 3:
             return "Each alliance must have exactly 3 teams.", 400
@@ -327,8 +328,8 @@ def simulate():
         alliance2 = [robot_dict[team] for team in alliance2_teams if team in robot_dict]
         if len(alliance1) != 3 or len(alliance2) != 3:
             return "One or more teams not found.", 404
-        points1, details1 = simulate_alliance(alliance1, mode=mode)
-        points2, details2 = simulate_alliance(alliance2, mode=mode)
+        points1, details1 = simulate_alliance(alliance1, mode=mode1)
+        points2, details2 = simulate_alliance(alliance2, mode=mode2)
         # Adjust points for defense impact
         total_defense_time1 = sum(details1[robot.name]['defense_time'] for robot in alliance1)
         total_defense_time2 = sum(details2[robot.name]['defense_time'] for robot in alliance2)
