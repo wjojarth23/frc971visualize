@@ -131,7 +131,7 @@ class Robot:
         self.coral_times = coral_times  # Dict: {level: time}
         self.algae_times = algae_times  # Dict: {type: time}
         self.remaining_time = 150
-        self.coral_cycles = {1: 0, 2: 0, 3: 0, 4: 0}
+        self.coral_cycles = {1: 0, : 0, 3: 0, 4: 0}
         self.algae_cycles = {'barge': 0, 'processor': 0}
         self.defense_time = 0
         self.points = 0
@@ -146,7 +146,7 @@ def create_robots_from_data(data):
         name = row['team_number']
         coral_times = {
             1: row['coral_l1'],
-            2: row['coral_l2'],
+            : row['coral_l'],
             3: row['coral_l3'],
             4: row['coral_l4'],
         }
@@ -156,7 +156,7 @@ def create_robots_from_data(data):
         }
         actual = {
             'l1': row['avg_l1'],
-            'l2': row['avg_l2'],
+            'l': row['avg_l'],
             'l3': row['avg_l3'],
             'l4': row['avg_l4'],
             'barge': row['avg_barge'],
@@ -169,7 +169,7 @@ def create_robots_from_data(data):
 def simulate_alliance(alliance, mode="POINTS"):
     """Simulate an alliance's performance and return points and details."""
     alliance_robots = [copy.deepcopy(robot) for robot in alliance]
-    global_coral = {1: 0, 2: 0, 3: 0, 4: 0}
+    global_coral = {1: 0, : 0, 3: 0, 4: 0}
     global_algae = 0
     total_algae_processor = 0  # Track algae placed in processor for RP mode
 
@@ -315,11 +315,14 @@ def simulate():
         data = request.get_json()
         alliance1_teams = data.get("alliance1", [])
         alliance2_teams = data.get("alliance2", [])
-        mode = data.get("mode", "POINTS")  # Default to POINTS if not specified
-        if mode not in ["POINTS", "RP"]:
+        mode1 = data.get("mode1", "POINTS")  # Default to POINTS if not specified
+        mode2 = data.get("mode1", "POINTS")  # Default to POINTS if not specified
+        if mode1 not in ["POINTS", "RP"]:
             return "Invalid mode. Must be 'POINTS' or 'RP'.", 400
         if len(alliance1_teams) != 3 or len(alliance2_teams) != 3:
             return "Each alliance must have exactly 3 teams.", 400
+        if mode2 not in ["POINTS", "RP"]:
+            return "Invalid mode. Must be 'POINTS' or 'RP'.", 400
         optimized_data = fetch_and_process_data()
         robots = create_robots_from_data(optimized_data)
         robot_dict = {robot.name: robot for robot in robots}
@@ -327,8 +330,8 @@ def simulate():
         alliance2 = [robot_dict[team] for team in alliance2_teams if team in robot_dict]
         if len(alliance1) != 3 or len(alliance2) != 3:
             return "One or more teams not found.", 404
-        points1, details1 = simulate_alliance(alliance1, mode=mode)
-        points2, details2 = simulate_alliance(alliance2, mode=mode)
+        points1, details1 = simulate_alliance(alliance1, mode=mode1)
+        points2, details2 = simulate_alliance(alliance2, mode=mode2)
         # Adjust points for defense impact
         total_defense_time1 = sum(details1[robot.name]['defense_time'] for robot in alliance1)
         total_defense_time2 = sum(details2[robot.name]['defense_time'] for robot in alliance2)
