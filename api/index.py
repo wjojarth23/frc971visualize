@@ -172,6 +172,12 @@ def simulate_alliance(alliance, mode="POINTS"):
     global_coral = {1: 0, 2: 0, 3: 0, 4: 0}
     global_algae = 0
     total_algae_processor = 0  # Track algae placed in processor for RP mode
+    
+    # Check if alliance lacks processor capabilities
+    has_processor_capability = any(robot.algae_times['processor'] < 999 for robot in alliance_robots)
+    
+    # If in RP mode and no processor capability, switch to coral-focused RP strategy
+    coral_focused_rp = mode == "RP" and not has_processor_capability
 
     while True:
         best_efficiency = 0
@@ -184,10 +190,12 @@ def simulate_alliance(alliance, mode="POINTS"):
                     continue  # Max of 12 coral per level
                 time_cost = robot.coral_times[level] + 0.5 * global_coral[level]
                 if time_cost <= robot.remaining_time:
-                    # In RP mode, prioritize coral on levels < 5 until 3 levels have >= 5
-                    if (mode == "RP" and 
-                        sum(1 for l in [1, 2, 3, 4] if global_coral[l] >= 5) < 3 and 
-                        global_coral[level] < 5):
+                    # In standard RP mode, prioritize coral on levels < 5 until 3 levels have >= 5
+                    # In coral-focused RP mode, prioritize all 4 levels to have >= 5
+                    if ((mode == "RP" and not coral_focused_rp and 
+                         sum(1 for l in [1, 2, 3, 4] if global_coral[l] >= 5) < 3 and 
+                         global_coral[level] < 5) or
+                        (coral_focused_rp and global_coral[level] < 5)):
                         points = 100  # High bonus to meet constraint
                     else:
                         points = 1 + level
@@ -195,10 +203,12 @@ def simulate_alliance(alliance, mode="POINTS"):
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('coral', level), time_cost
+            
             for algae_type in ['barge', 'processor']:
                 time_cost = robot.algae_times[algae_type] + 0.3 * global_algae
-                # In RP mode, prioritize processor algae until 2 are placed
-                if mode == "RP" and algae_type == 'processor' and total_algae_processor < 2:
+                # In standard RP mode, prioritize processor algae until 2 are placed
+                # In coral-focused RP mode, don't prioritize processor
+                if mode == "RP" and not coral_focused_rp and algae_type == 'processor' and total_algae_processor < 2:
                     points = 100  # High bonus to meet constraint
                 else:
                     points = 4 if algae_type == 'barge' else 2
@@ -207,13 +217,16 @@ def simulate_alliance(alliance, mode="POINTS"):
                     if efficiency > best_efficiency:
                         best_efficiency = efficiency
                         best_robot, best_action, best_action_time = robot, ('algae', algae_type), time_cost
+            
             if robot.remaining_time >= 10:
                 defense_cost = 10 if robot.defense_time == 0 else 1
                 if 0.05 >= best_efficiency and defense_cost <= robot.remaining_time:
                     best_efficiency = 0.05
                     best_robot, best_action, best_action_time = robot, ('defense', None), defense_cost
+        
         if not best_robot:
             break
+        
         if best_action[0] == 'coral':
             level = best_action[1]
             best_robot.coral_cycles[level] += 1
@@ -230,7 +243,9 @@ def simulate_alliance(alliance, mode="POINTS"):
             added_time = 10 if best_robot.defense_time == 0 else 1
             best_robot.defense_time += added_time
             best_robot.points += 0
+        
         best_robot.remaining_time -= best_action_time
+    
     total_points = sum(r.points for r in alliance_robots)
     details = {r.name: {
         "coral_l1": r.coral_cycles[1], "coral_l2": r.coral_cycles[2],
@@ -241,6 +256,7 @@ def simulate_alliance(alliance, mode="POINTS"):
         "time_coral_l3": r.coral_times[3], "time_coral_l4": r.coral_times[4],
         "time_algae_barge": r.algae_times['barge'], "time_algae_processor": r.algae_times['processor']
     } for r in alliance_robots}
+    
     return total_points, details
 
 def aggregate_simulations(robots):
