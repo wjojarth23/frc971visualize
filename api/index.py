@@ -31,7 +31,7 @@ def fetch_and_process_data():
     query = """
     SELECT *
     FROM stats2025 s
-    WHERE s.comp_code IN ('2025camb', '2016nytr')
+    WHERE s.comp_code IN ('2025cave')
     ORDER BY s.match_number;
     """
     df = pd.read_sql_query(query, conn)
